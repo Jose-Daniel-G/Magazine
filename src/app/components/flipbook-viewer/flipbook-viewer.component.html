@@ -1,0 +1,127 @@
+<div class="viewer-container">
+  <!-- Top Toolbar -->
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <button class="icon-btn" (click)="toggleThumbnails()" title="Miniaturas">
+        📋
+      </button>
+    </div>
+
+    <div class="toolbar-group">
+      <button class="icon-btn" (click)="zoomOut()" [disabled]="zoom <= 1" title="Zoom -">
+        🔍−
+      </button>
+      <span class="zoom-display">{{ (zoom * 100).toFixed(0) }}%</span>
+      <button class="icon-btn" (click)="zoomIn()" [disabled]="zoom >= maxZoom" title="Zoom +">
+        🔍+
+      </button>
+      <button class="icon-btn" (click)="resetZoom()" title="Reset Zoom">
+        ⟲
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Flipbook -->
+  <div class="flipbook-main" [style.--zoom]="zoom">
+    <div class="book">
+      <!-- Left Slot -->
+      <div class="page-slot page-slot-left">
+        <div class="page page-left"
+          *ngIf="leftPageIndex >= 0 && leftPageIndex < totalPages"
+          [@fadeIn]>
+          <div class="page-content">
+            <img
+              *ngIf="getPageImage(leftPageIndex)"
+              [src]="getPageImage(leftPageIndex)"
+              [alt]="'Página ' + (leftPageIndex + 1)"
+              class="page-image">
+            <div *ngIf="!getPageImage(leftPageIndex)" class="page-placeholder">
+              Página {{ leftPageIndex + 1 }}
+            </div>
+          </div>
+          <div class="page-number">{{ leftPageIndex + 1 }}</div>
+        </div>
+
+        <!-- Flipping leaf: hinge on the spine (right edge), swings right→left on backward turn -->
+        <div
+          class="flip-leaf flip-leaf-left"
+          *ngIf="isFlipping && flipSide === 'left'"
+          [class.flip-leaf-active]="flipActive">
+          <div class="flip-face flip-face-front">
+            <img *ngIf="flipFrontImage" [src]="flipFrontImage" class="page-image" alt="">
+          </div>
+          <div class="flip-face flip-face-back">
+            <img *ngIf="flipBackImage" [src]="flipBackImage" class="page-image" alt="">
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Slot -->
+      <div class="page-slot page-slot-right">
+        <div class="page page-right"
+          *ngIf="rightPageIndex >= 0 && rightPageIndex < totalPages"
+          [@fadeIn]>
+          <div class="page-content">
+            <img
+              *ngIf="getPageImage(rightPageIndex)"
+              [src]="getPageImage(rightPageIndex)"
+              [alt]="'Página ' + (rightPageIndex + 1)"
+              class="page-image">
+            <div *ngIf="!getPageImage(rightPageIndex)" class="page-placeholder">
+              Página {{ rightPageIndex + 1 }}
+            </div>
+          </div>
+          <div class="page-number">{{ rightPageIndex + 1 }}</div>
+        </div>
+
+        <!-- Flipping leaf: hinge on the spine (left edge), swings left→right on forward turn -->
+        <div
+          class="flip-leaf flip-leaf-right"
+          *ngIf="isFlipping && flipSide === 'right'"
+          [class.flip-leaf-active]="flipActive">
+          <div class="flip-face flip-face-front">
+            <img *ngIf="flipFrontImage" [src]="flipFrontImage" class="page-image" alt="">
+          </div>
+          <div class="flip-face flip-face-back">
+            <img *ngIf="flipBackImage" [src]="flipBackImage" class="page-image" alt="">
+          </div>
+        </div>
+      </div>
+
+      <!-- Click zones for flipping -->
+      <div class="click-zone click-zone-prev" (click)="flipBackward()" title="Página anterior">
+      </div>
+      <div class="click-zone click-zone-next" (click)="flipForward()" title="Página siguiente">
+      </div>
+    </div>
+  </div>
+
+  <!-- Thumbnails Panel -->
+  <div class="thumbnails-panel" *ngIf="showThumbnails" [@fadeIn]>
+    <h3>Páginas</h3>
+    <div class="thumbnails-grid">
+      <div
+        *ngFor="let pageNum of pageList"
+        class="thumbnail"
+        [class.active]="pageNum === leftPageIndex || pageNum === rightPageIndex"
+        (click)="goToPage(pageNum)"
+        title="Ir a página {{ pageNum + 1 }}">
+        <img
+          *ngIf="getPageImage(pageNum)"
+          [src]="getPageImage(pageNum)"
+          [alt]="'Miniatura página ' + (pageNum + 1)">
+        <div class="thumbnail-number">{{ pageNum + 1 }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile Navigation -->
+  <div class="mobile-nav">
+    <button class="nav-btn" (click)="flipBackward()" title="Anterior">
+      ‹
+    </button>
+    <button class="nav-btn" (click)="flipForward()" title="Siguiente">
+      ›
+    </button>
+  </div>
+</div>

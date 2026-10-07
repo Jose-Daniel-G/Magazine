@@ -1,0 +1,10 @@
+# This file is used by the build system to adjust CSS and JS output to support the specified browsers below.
+# For more information, see the browserslist configuration in package.json: https://github.com/browserslist/browserslist
+
+last 2 Chrome versions
+last 2 Firefox versions
+last 2 Safari versions
+last 2 Edge versions
+Chrome >= 90
+Firefox >= 88
+Safari >= 14

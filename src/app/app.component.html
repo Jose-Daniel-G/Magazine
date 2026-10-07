@@ -1,0 +1,62 @@
+<div class="reader">
+  <!-- Masthead -->
+  <header class="masthead">
+    <span class="masthead__label">{{ title }}</span>
+    <button class="masthead__download" (click)="downloadPDF()" title="Descargar PDF">
+      Descargar PDF ↓
+    </button>
+  </header>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="state state--loading">
+    <div class="spinner"></div>
+    <p class="state__text">Cargando revista…</p>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="errorMessage && !loading" class="state state--error">
+    <p class="state__text">{{ errorMessage }}</p>
+    <button (click)="loadPDF()" class="state__retry">Reintentar</button>
+  </div>
+
+  <!-- Flipbook Content -->
+  <div *ngIf="!loading && !errorMessage" class="stage">
+    <!-- Flipbook Viewer -->
+    <app-flipbook-viewer 
+      [currentPage]="currentPage"
+      [totalPages]="totalPages"
+      (pageChange)="goToPage($event)">
+    </app-flipbook-viewer>
+
+    <!-- Reader Bar -->
+    <div class="reader-bar">
+      <button 
+        class="reader-bar__nav" 
+        (click)="prevPage()" 
+        [disabled]="!canGoPrev">
+        ← Anterior
+      </button>
+
+      <div class="reader-bar__folio">
+        <input 
+          type="number" 
+          [value]="currentPage + 1"
+          [max]="totalPages"
+          min="1"
+          (change)="onPageInputChange($event)"
+          class="reader-bar__input">
+        <span class="reader-bar__total">/ {{ totalPages }}</span>
+      </div>
+
+      <button 
+        class="reader-bar__nav" 
+        (click)="nextPage()" 
+        [disabled]="!canGoNext">
+        Siguiente →
+      </button>
+    </div>
+
+    <!-- Keyboard Shortcut Info -->
+    <p class="hint">Usa ← → o haz clic en los bordes de la página para navegar</p>
+  </div>
+</div>
