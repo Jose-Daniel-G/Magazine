@@ -1,7 +1,8 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges, HostListener } from '@angular/core';
+import { ChangeDetectorRef, Component, Input, Output, EventEmitter, OnInit, OnChanges, OnDestroy, SimpleChanges, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { trigger, transition, style, animate } from '@angular/animations';
 import { FlipbookService } from '../../services/flipbook.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-flipbook-viewer',
@@ -18,7 +19,7 @@ import { FlipbookService } from '../../services/flipbook.service';
     ])
   ]
 })
-export class FlipbookViewerComponent implements OnInit, OnChanges {
+export class FlipbookViewerComponent implements OnInit, OnChanges, OnDestroy {
   @Input() currentPage = 0;
   @Input() totalPages = 0;
   @Output() pageChange = new EventEmitter<number>();
@@ -37,23 +38,65 @@ export class FlipbookViewerComponent implements OnInit, OnChanges {
   showThumbnails = false;
   zoom = 1;
   maxZoom = 2;
+  isSinglePage = false;
 
   private readonly FLIP_DURATION = 700;
+  private readonly requestedPageIndexes = new Set<number>();
+  private pageRenderedSubscription?: Subscription;
 
-  constructor(private flipbookService: FlipbookService) {}
+  constructor(
+    private flipbookService: FlipbookService,
+    private changeDetector: ChangeDetectorRef
+  ) {}
 
   ngOnInit() {
-    this.leftPageIndex = this.spreadStart(this.currentPage);
-    this.rightPageIndex = this.leftPageIndex + 1;
+    this.pageRenderedSubscription = this.flipbookService.pageRendered.subscribe(() => {
+      this.changeDetector.detectChanges();
+      this.ensurePageImages();
+    });
+    this.updatePageMode();
+    this.syncVisiblePages();
+    this.ensurePageImages();
+  }
+
+  ngOnDestroy() {
+    this.pageRenderedSubscription?.unsubscribe();
   }
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes['currentPage'] && !changes['currentPage'].firstChange) {
+      if (this.isSinglePage) {
+        this.leftPageIndex = this.currentPage;
+        this.rightPageIndex = this.currentPage;
+        this.ensurePageImages();
+        return;
+      }
       const target = this.spreadStart(this.currentPage);
       if (target !== this.leftPageIndex) {
         this.animateToSpread(target);
       }
+      this.ensurePageImages();
     }
+  }
+
+  @HostListener('window:resize')
+  updatePageMode() {
+    const singlePage = typeof window !== 'undefined'
+      && window.matchMedia('(max-width: 768px)').matches;
+    if (singlePage !== this.isSinglePage) {
+      this.isSinglePage = singlePage;
+      this.syncVisiblePages();
+      this.ensurePageImages();
+    }
+  }
+
+  private syncVisiblePages() {
+    this.leftPageIndex = this.isSinglePage
+      ? this.currentPage
+      : this.spreadStart(this.currentPage);
+    this.rightPageIndex = this.isSinglePage
+      ? this.currentPage
+      : this.leftPageIndex + 1;
   }
 
   private spreadStart(page: number): number {
@@ -69,10 +112,12 @@ export class FlipbookViewerComponent implements OnInit, OnChanges {
   }
 
   get canFlipForward(): boolean {
+    if (this.isSinglePage) return this.currentPage < this.totalPages - 1;
     return this.rightPageIndex < this.totalPages - 1;
   }
 
   get canFlipBackward(): boolean {
+    if (this.isSinglePage) return this.currentPage > 0;
     return this.leftPageIndex > 0;
   }
 
@@ -132,6 +177,10 @@ export class FlipbookViewerComponent implements OnInit, OnChanges {
    */
   flipForward() {
     if (!this.canFlipForward) return;
+    if (this.isSinglePage) {
+      this.pageChange.emit(this.currentPage + 1);
+      return;
+    }
     const newLeft = this.leftPageIndex + 2;
     this.animateToSpread(newLeft);
     this.pageChange.emit(newLeft);
@@ -142,6 +191,10 @@ export class FlipbookViewerComponent implements OnInit, OnChanges {
    */
   flipBackward() {
     if (!this.canFlipBackward) return;
+    if (this.isSinglePage) {
+      this.pageChange.emit(this.currentPage - 1);
+      return;
+    }
     const newLeft = Math.max(0, this.leftPageIndex - 2);
     this.animateToSpread(newLeft);
     this.pageChange.emit(newLeft);
@@ -152,6 +205,10 @@ export class FlipbookViewerComponent implements OnInit, OnChanges {
    */
   goToPage(pageIndex: number) {
     if (pageIndex < 0 || pageIndex >= this.totalPages) return;
+    if (this.isSinglePage) {
+      if (pageIndex !== this.currentPage) this.pageChange.emit(pageIndex);
+      return;
+    }
     const target = this.spreadStart(pageIndex);
     if (target === this.leftPageIndex) return;
     this.animateToSpread(target);
@@ -163,6 +220,32 @@ export class FlipbookViewerComponent implements OnInit, OnChanges {
    */
   toggleThumbnails() {
     this.showThumbnails = !this.showThumbnails;
+    if (this.showThumbnails) this.ensurePageImages();
+  }
+
+  private ensurePageImages() {
+    const pageIndexes = this.showThumbnails
+      ? this.pageList
+      : this.isSinglePage
+        ? [this.currentPage]
+        : [this.leftPageIndex, this.rightPageIndex];
+
+    for (const pageIndex of pageIndexes) {
+      if (
+        pageIndex < 0
+        || pageIndex >= this.totalPages
+        || this.flipbookService.getPageImage(pageIndex)
+        || this.requestedPageIndexes.has(pageIndex)
+      ) {
+        continue;
+      }
+
+      this.requestedPageIndexes.add(pageIndex);
+      this.flipbookService.renderPageImage(pageIndex).catch((error: unknown) => {
+        this.requestedPageIndexes.delete(pageIndex);
+        console.error(`Error renderizando página ${pageIndex + 1}:`, error);
+      });
+    }
   }
 
   /**

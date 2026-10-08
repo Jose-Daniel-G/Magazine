@@ -88,6 +88,22 @@
         </div>
       </div>
 
+      <div class="page-slot page-slot-single">
+        <div class="page" *ngIf="currentPage >= 0 && currentPage < totalPages" [@fadeIn]>
+          <div class="page-content">
+            <img
+              *ngIf="getPageImage(currentPage)"
+              [src]="getPageImage(currentPage)"
+              [alt]="'Página ' + (currentPage + 1)"
+              class="page-image">
+            <div *ngIf="!getPageImage(currentPage)" class="page-placeholder">
+              Página {{ currentPage + 1 }}
+            </div>
+          </div>
+          <div class="page-number">{{ currentPage + 1 }}</div>
+        </div>
+      </div>
+
       <!-- Click zones for flipping -->
       <div class="click-zone click-zone-prev" (click)="flipBackward()" title="Página anterior">
       </div>

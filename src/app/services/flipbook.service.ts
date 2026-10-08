@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import * as pdfjsLib from 'pdfjs-dist';
+import { Subject } from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
@@ -7,10 +8,13 @@ import * as pdfjsLib from 'pdfjs-dist';
 export class FlipbookService {
   private pdfDocument: any = null;
   private pageCanvas: Map<number, string> = new Map();
+  private pageRenderTasks = new Map<number, Promise<string>>();
+  readonly pageRendered = new Subject<number>();
 
   constructor() {
     // Configurar el worker de PDF.js
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker.min.mjs';
+      // pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker.min.mjs';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker.min.mjs';
     // pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
   }
 
@@ -23,12 +27,11 @@ export class FlipbookService {
     try {
       // Cargar el documento PDF
       this.pdfDocument = await pdfjsLib.getDocument(pdfPath).promise;
+      this.pageCanvas.clear();
+      this.pageRenderTasks.clear();
       
       const totalPages = this.pdfDocument.numPages;
       console.log(`PDF cargado: ${totalPages} páginas`);
-
-      // Pre-renderizar todas las páginas
-      await this.renderAllPages();
 
       return totalPages;
     } catch (error) {
@@ -37,23 +40,27 @@ export class FlipbookService {
     }
   }
 
-  /**
-   * Renderizar todas las páginas del PDF como imágenes Base64
-   */
-  private async renderAllPages(): Promise<void> {
-    if (!this.pdfDocument) return;
+  renderPageImage(pageIndex: number): Promise<string> {
+    const cachedImage = this.pageCanvas.get(pageIndex);
+    if (cachedImage) return Promise.resolve(cachedImage);
 
-    const totalPages = this.pdfDocument.numPages;
-    
-    for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-      try {
-        const imageData = await this.renderPage(pageNum);
-        this.pageCanvas.set(pageNum - 1, imageData);
-        console.log(`Página ${pageNum} renderizada`);
-      } catch (error) {
-        console.error(`Error renderizando página ${pageNum}:`, error);
-      }
+    const existingTask = this.pageRenderTasks.get(pageIndex);
+    if (existingTask) return existingTask;
+
+    if (!this.pdfDocument || pageIndex < 0 || pageIndex >= this.pdfDocument.numPages) {
+      return Promise.reject(new Error(`Índice de página inválido: ${pageIndex}`));
     }
+
+    const task = this.renderPage(pageIndex + 1).then((imageData) => {
+      this.pageCanvas.set(pageIndex, imageData);
+      this.pageRendered.next(pageIndex);
+      return imageData;
+    }).finally(() => {
+      this.pageRenderTasks.delete(pageIndex);
+    });
+
+    this.pageRenderTasks.set(pageIndex, task);
+    return task;
   }
 
   /**
@@ -117,5 +124,6 @@ export class FlipbookService {
       this.pdfDocument = null;
     }
     this.pageCanvas.clear();
+    this.pageRenderTasks.clear();
   }
 }

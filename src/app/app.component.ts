@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, HostListener, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { FlipbookViewerComponent } from './components/flipbook-viewer/flipbook-viewer.component';
@@ -17,11 +17,24 @@ export class AppComponent implements OnInit {
   totalPages = 0;
   loading = true;
   errorMessage = '';
+  isSinglePage = false;
 
   constructor(private flipbookService: FlipbookService) {}
 
   ngOnInit() {
+    this.updatePageMode();
     this.loadPDF();
+  }
+
+  @HostListener('window:resize')
+  updatePageMode() {
+    if (typeof window !== 'undefined') {
+      const isSinglePage = window.matchMedia('(max-width: 768px)').matches;
+      if (this.isSinglePage && !isSinglePage) {
+        this.currentPage = this.spreadStart(this.currentPage);
+      }
+      this.isSinglePage = isSinglePage;
+    }
   }
 
   loadPDF() {
@@ -46,28 +59,36 @@ export class AppComponent implements OnInit {
 
   nextPage() {
     if (this.canGoNext) {
-      this.currentPage = this.spreadStart(this.currentPage) + 2;
+      this.currentPage = this.isSinglePage
+        ? this.currentPage + 1
+        : this.spreadStart(this.currentPage) + 2;
     }
   }
 
   prevPage() {
     if (this.canGoPrev) {
-      this.currentPage = Math.max(0, this.spreadStart(this.currentPage) - 2);
+      this.currentPage = this.isSinglePage
+        ? this.currentPage - 1
+        : Math.max(0, this.spreadStart(this.currentPage) - 2);
     }
   }
 
   goToPage(page: number) {
     if (page >= 0 && page < this.totalPages) {
-      this.currentPage = this.spreadStart(page);
+      this.currentPage = this.isSinglePage ? page : this.spreadStart(page);
     }
   }
 
   get canGoNext(): boolean {
-    return this.spreadStart(this.currentPage) + 1 < this.totalPages - 1;
+    return this.isSinglePage
+      ? this.currentPage < this.totalPages - 1
+      : this.spreadStart(this.currentPage) + 1 < this.totalPages - 1;
   }
 
   get canGoPrev(): boolean {
-    return this.spreadStart(this.currentPage) > 0;
+    return this.isSinglePage
+      ? this.currentPage > 0
+      : this.spreadStart(this.currentPage) > 0;
   }
 
   onPageInputChange(event: any): void {

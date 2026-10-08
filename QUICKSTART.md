@@ -111,3 +111,8 @@ Ver `README.md` para documentación detallada
 ---
 
 **¡Listo para empezar! Cualquier pregunta, revisa la consola (F12) para errores.**
+## Deploy 
+``` 
+npx ng build --configuration production --base-href /Magazine/
+npx angular-cli-ghpages --dir=dist/flipbook-revista
+```
